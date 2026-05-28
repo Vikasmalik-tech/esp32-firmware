@@ -240,7 +240,7 @@
   <div class="info-item"><span class="info-icon">&#128337;</span> Last update: <strong id="lastUpdate">--</strong></div>
   <div class="info-item"><span class="info-icon">&#128225;</span> ESP32 IP: <strong id="espIP">--</strong></div>
   <div class="info-item"><span class="info-icon">&#9889;</span> Meters online: <strong id="onlineCount">0/8</strong></div>
-  <div class="info-item"><span class="info-icon">&#128260;</span> Auto-refresh: <strong>10s</strong></div>
+  <div class="info-item"><span class="info-icon">&#128260;</span> Auto-refresh: <strong>5s</strong></div>
 </div>
 
 <div class="summary" id="summarySection">
@@ -264,7 +264,7 @@
 
 <script>
 const FIREBASE_URL = "https://energy-meter-5d179-default-rtdb.asia-southeast1.firebasedatabase.app/meters.json";
-const REFRESH_MS = 10000;
+const REFRESH_MS = 5000;
 
 const PARAMS = [
   { key: "voltage",   label: "Voltage",        unit: "V",   decimals: 1, colorClass: "color-voltage" },
