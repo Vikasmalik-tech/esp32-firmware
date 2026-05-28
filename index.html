@@ -4,99 +4,272 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Energy Meter Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Segoe UI', sans-serif; background: #0a0a1a; color: #fff; min-height: 100vh; }
+  body {
+    font-family: 'Inter', sans-serif;
+    background: #060b18;
+    color: #fff;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
 
+  /* Animated background */
+  body::before {
+    content: '';
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background:
+      radial-gradient(ellipse at 20% 50%, rgba(16, 85, 205, 0.08) 0%, transparent 60%),
+      radial-gradient(ellipse at 80% 20%, rgba(124, 58, 237, 0.06) 0%, transparent 60%),
+      radial-gradient(ellipse at 50% 80%, rgba(6, 182, 212, 0.05) 0%, transparent 60%);
+    z-index: -1;
+  }
+
+  /* Header */
   .header {
-    background: linear-gradient(135deg, #0d1b2a, #1b2a4a);
-    padding: 20px 30px;
+    background: rgba(10, 15, 30, 0.85);
+    backdrop-filter: blur(20px);
+    padding: 20px 40px;
     display: flex; justify-content: space-between; align-items: center;
-    border-bottom: 2px solid #2a7fff;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    position: sticky; top: 0; z-index: 100;
   }
-  .header h1 { font-size: 24px; color: #fff; }
-  .header .status { display: flex; align-items: center; gap: 15px; font-size: 14px; color: #aaa; }
-  .status-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
-  .status-dot.online { background: #2f8; }
-  .status-dot.offline { background: #f44; }
+  .header-left { display: flex; align-items: center; gap: 14px; }
+  .logo {
+    width: 42px; height: 42px; border-radius: 12px;
+    background: linear-gradient(135deg, #2563eb, #7c3aed);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; font-weight: 800; color: #fff;
+    box-shadow: 0 4px 15px rgba(37, 99, 235, 0.3);
+  }
+  .header-title h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.5px; }
+  .header-title span { font-size: 12px; color: #64748b; font-weight: 400; }
+  .header-right { display: flex; align-items: center; gap: 20px; }
+  .status-pill {
+    display: flex; align-items: center; gap: 8px;
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08);
+    padding: 6px 14px; border-radius: 20px; font-size: 13px; color: #94a3b8;
+  }
+  .status-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    display: inline-block; position: relative;
+  }
+  .status-dot.online {
+    background: #22c55e;
+    box-shadow: 0 0 8px rgba(34, 197, 94, 0.6);
+  }
+  .status-dot.online::after {
+    content: ''; position: absolute; top: -3px; left: -3px;
+    width: 14px; height: 14px; border-radius: 50%;
+    background: rgba(34, 197, 94, 0.3);
+    animation: pulse 2s infinite;
+  }
+  .status-dot.offline { background: #ef4444; box-shadow: 0 0 8px rgba(239, 68, 68, 0.6); }
+  @keyframes pulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.5); opacity: 0; } }
 
+  .fw-badge {
+    background: rgba(124, 58, 237, 0.15); border: 1px solid rgba(124, 58, 237, 0.3);
+    padding: 4px 12px; border-radius: 6px; font-size: 12px; color: #a78bfa; font-weight: 600;
+  }
+
+  /* Info bar */
   .info-bar {
-    background: #111; padding: 10px 30px; display: flex; gap: 30px;
-    font-size: 13px; color: #888; border-bottom: 1px solid #222;
+    background: rgba(255,255,255,0.02);
+    padding: 12px 40px;
+    display: flex; gap: 30px; flex-wrap: wrap;
+    font-size: 12px; color: #475569;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
   }
+  .info-bar strong { color: #94a3b8; }
+  .info-item { display: flex; align-items: center; gap: 6px; }
+  .info-icon { font-size: 14px; }
 
+  /* Summary cards */
+  .summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px; padding: 24px 40px 0;
+  }
+  .summary-card {
+    background: linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01));
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 14px; padding: 18px 20px;
+    transition: transform 0.2s, border-color 0.2s;
+  }
+  .summary-card:hover { transform: translateY(-2px); border-color: rgba(255,255,255,0.12); }
+  .summary-label { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 600; }
+  .summary-value { font-size: 28px; font-weight: 800; margin-top: 6px; letter-spacing: -1px; }
+  .summary-sub { font-size: 12px; color: #475569; margin-top: 4px; }
+
+  /* Grid */
   .grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-    gap: 20px; padding: 20px 30px;
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+    gap: 20px; padding: 24px 40px 40px;
   }
 
+  /* Meter card */
   .meter-card {
-    background: #111827; border-radius: 12px; overflow: hidden;
-    border: 1px solid #1e293b;
+    background: linear-gradient(145deg, rgba(17, 24, 39, 0.8), rgba(17, 24, 39, 0.4));
+    backdrop-filter: blur(10px);
+    border-radius: 16px; overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.06);
+    transition: transform 0.3s, box-shadow 0.3s, border-color 0.3s;
+  }
+  .meter-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+    border-color: rgba(255,255,255,0.12);
   }
   .meter-header {
-    padding: 12px 16px; display: flex; justify-content: space-between; align-items: center;
+    padding: 16px 20px;
+    display: flex; justify-content: space-between; align-items: center;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    position: relative; overflow: hidden;
   }
-  .meter-header h3 { font-size: 16px; color: #fff; }
-  .meter-header .badge {
-    font-size: 11px; padding: 3px 10px; border-radius: 12px; font-weight: 600;
+  .meter-header::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
   }
-  .badge.online { background: #064e3b; color: #34d399; }
-  .badge.offline { background: #4c0519; color: #fb7185; }
+  .meter-header h3 { font-size: 15px; font-weight: 700; color: #fff; }
+  .meter-addr { font-size: 11px; color: #475569; font-weight: 500; margin-left: 8px; }
+  .meter-number {
+    font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 6px;
+    margin-right: 8px; color: #fff;
+  }
+  .badge {
+    font-size: 10px; padding: 4px 12px; border-radius: 20px;
+    font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
+  }
+  .badge.online { background: rgba(34, 197, 94, 0.12); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.2); }
+  .badge.offline { background: rgba(239, 68, 68, 0.12); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.2); }
 
+  /* Params grid */
   .params {
-    display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: #1e293b;
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 1px; background: rgba(255,255,255,0.03);
   }
   .param {
-    background: #111827; padding: 12px 16px;
+    background: rgba(17, 24, 39, 0.6);
+    padding: 14px 18px;
+    transition: background 0.2s;
   }
-  .param-label { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 1px; }
-  .param-value { font-size: 24px; font-weight: 700; margin-top: 4px; }
-  .param-unit { font-size: 13px; font-weight: 400; color: #64748b; margin-left: 4px; }
+  .param:hover { background: rgba(30, 41, 59, 0.6); }
+  .param-label {
+    font-size: 10px; color: #64748b; text-transform: uppercase;
+    letter-spacing: 1.5px; font-weight: 600;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .param-unit-label { color: #475569; font-weight: 500; }
+  .param-value {
+    font-size: 26px; font-weight: 800; margin-top: 6px;
+    letter-spacing: -0.5px;
+    transition: color 0.3s;
+  }
+  .param-unit { font-size: 14px; font-weight: 400; color: #64748b; margin-left: 4px; }
+  .param-value.offline { color: #1e293b !important; }
 
   .color-voltage .param-value { color: #fbbf24; }
   .color-current .param-value { color: #22d3ee; }
   .color-power .param-value { color: #4ade80; }
   .color-energy .param-value { color: #fb923c; }
-  .color-freq .param-value { color: #e879f9; }
+  .color-freq .param-value { color: #c084fc; }
   .color-pf .param-value { color: #60a5fa; }
   .color-temp .param-value { color: #f87171; }
 
-  .param-value.offline { color: #475569 !important; }
+  /* Color bar indicators */
+  .color-voltage { border-left: 3px solid rgba(251, 191, 36, 0.3); }
+  .color-current { border-left: 3px solid rgba(34, 211, 238, 0.3); }
+  .color-power { border-left: 3px solid rgba(74, 222, 128, 0.3); }
+  .color-energy { border-left: 3px solid rgba(251, 146, 60, 0.3); }
+  .color-freq { border-left: 3px solid rgba(192, 132, 252, 0.3); }
+  .color-pf { border-left: 3px solid rgba(96, 165, 250, 0.3); }
+  .color-temp { border-left: 3px solid rgba(248, 113, 113, 0.3); }
 
+  /* Footer */
   .footer {
-    text-align: center; padding: 20px; color: #444; font-size: 12px;
+    text-align: center; padding: 30px; color: #1e293b; font-size: 12px;
+    border-top: 1px solid rgba(255,255,255,0.03);
+  }
+  .footer a { color: #475569; text-decoration: none; }
+
+  /* Refresh indicator */
+  .refresh-bar {
+    position: fixed; top: 0; left: 0; height: 2px; z-index: 200;
+    background: linear-gradient(90deg, #2563eb, #7c3aed, #06b6d4);
+    transition: width 1s linear;
   }
 
-  @media (max-width: 600px) {
-    .header { flex-direction: column; gap: 10px; text-align: center; }
-    .info-bar { flex-wrap: wrap; justify-content: center; }
-    .grid { grid-template-columns: 1fr; padding: 10px; }
-    .params { grid-template-columns: 1fr 1fr; }
+  /* Responsive */
+  @media (max-width: 768px) {
+    .header { flex-direction: column; gap: 12px; padding: 16px 20px; text-align: center; }
+    .header-right { flex-wrap: wrap; justify-content: center; }
+    .info-bar { padding: 10px 20px; justify-content: center; }
+    .summary { grid-template-columns: repeat(2, 1fr); padding: 16px 16px 0; gap: 10px; }
+    .grid { grid-template-columns: 1fr; padding: 16px; gap: 16px; }
+    .param-value { font-size: 22px; }
+    .summary-value { font-size: 22px; }
+  }
+  @media (max-width: 400px) {
+    .summary { grid-template-columns: 1fr; }
   }
 </style>
 </head>
 <body>
 
+<div class="refresh-bar" id="refreshBar"></div>
+
 <div class="header">
-  <h1>Energy Meter Dashboard</h1>
-  <div class="status">
-    <span><span class="status-dot" id="connDot"></span> <span id="connText">Connecting...</span></span>
-    <span id="fwVersion"></span>
+  <div class="header-left">
+    <div class="logo">E</div>
+    <div class="header-title">
+      <h1>Energy Meter Dashboard</h1>
+      <span>Real-time monitoring system</span>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="status-pill">
+      <span class="status-dot" id="connDot"></span>
+      <span id="connText">Connecting...</span>
+    </div>
+    <span class="fw-badge" id="fwVersion">--</span>
   </div>
 </div>
 
 <div class="info-bar">
-  <span>Last update: <strong id="lastUpdate">--</strong></span>
-  <span>ESP32 IP: <strong id="espIP">--</strong></span>
-  <span>Auto-refresh: <strong>10s</strong></span>
+  <div class="info-item"><span class="info-icon">&#128337;</span> Last update: <strong id="lastUpdate">--</strong></div>
+  <div class="info-item"><span class="info-icon">&#128225;</span> ESP32 IP: <strong id="espIP">--</strong></div>
+  <div class="info-item"><span class="info-icon">&#9889;</span> Meters online: <strong id="onlineCount">0/8</strong></div>
+  <div class="info-item"><span class="info-icon">&#128260;</span> Auto-refresh: <strong>10s</strong></div>
+</div>
+
+<div class="summary" id="summarySection">
+  <div class="summary-card">
+    <div class="summary-label">Total Power</div>
+    <div class="summary-value" style="color:#4ade80" id="totalPower">-- <span class="param-unit">W</span></div>
+    <div class="summary-sub">All meters combined</div>
+  </div>
+  <div class="summary-card">
+    <div class="summary-label">Total Energy</div>
+    <div class="summary-value" style="color:#fb923c" id="totalEnergy">-- <span class="param-unit">kWh</span></div>
+    <div class="summary-sub">Cumulative consumption</div>
+  </div>
+  <div class="summary-card">
+    <div class="summary-label">Avg Voltage</div>
+    <div class="summary-value" style="color:#fbbf24" id="avgVoltage">-- <span class="param-unit">V</span></div>
+    <div class="summary-sub">Across all meters</div>
+  </div>
+  <div class="summary-card">
+    <div class="summary-label">Total Current</div>
+    <div class="summary-value" style="color:#22d3ee" id="totalCurrent">-- <span class="param-unit">A</span></div>
+    <div class="summary-sub">All meters combined</div>
+  </div>
 </div>
 
 <div class="grid" id="meterGrid"></div>
 
 <div class="footer">
-  Energy Meter Dashboard &mdash; Firebase Realtime Database
+  Energy Meter Dashboard &mdash; Powered by ESP32 + Firebase
 </div>
 
 <script>
@@ -104,19 +277,34 @@ const FIREBASE_URL = "https://energy-meter-5d179-default-rtdb.asia-southeast1.fi
 const REFRESH_MS = 10000;
 
 const PARAMS = [
-  { key: "voltage",   label: "Voltage",   unit: "V",   decimals: 1, colorClass: "color-voltage" },
-  { key: "current",   label: "Current",   unit: "A",   decimals: 3, colorClass: "color-current" },
-  { key: "power",     label: "Power",     unit: "W",   decimals: 1, colorClass: "color-power" },
-  { key: "energy",    label: "Energy",    unit: "kWh", decimals: 2, colorClass: "color-energy" },
-  { key: "frequency", label: "Frequency", unit: "Hz",  decimals: 2, colorClass: "color-freq" },
-  { key: "pf",        label: "Power Factor", unit: "", decimals: 3, colorClass: "color-pf" },
-  { key: "temp",      label: "Temperature", unit: "\u00B0C", decimals: 0, colorClass: "color-temp" }
+  { key: "voltage",   label: "Voltage",        unit: "V",   decimals: 1, colorClass: "color-voltage" },
+  { key: "current",   label: "Current",         unit: "A",   decimals: 3, colorClass: "color-current" },
+  { key: "power",     label: "Power",           unit: "W",   decimals: 1, colorClass: "color-power" },
+  { key: "energy",    label: "Energy",          unit: "kWh", decimals: 2, colorClass: "color-energy" },
+  { key: "frequency", label: "Frequency",       unit: "Hz",  decimals: 2, colorClass: "color-freq" },
+  { key: "pf",        label: "Power Factor",    unit: "",    decimals: 3, colorClass: "color-pf" },
+  { key: "temp",      label: "Temperature",     unit: "\u00B0C", decimals: 0, colorClass: "color-temp" }
 ];
 
 const METER_COLORS = [
-  "#2a7fff", "#82c000", "#07ffff", "#47e000",
-  "#fea000", "#fc8000", "#5d5fff", "#f92000"
+  "#2563eb", "#16a34a", "#06b6d4", "#8b5cf6",
+  "#f59e0b", "#ef4444", "#ec4899", "#14b8a6"
 ];
+
+let refreshProgress = 0;
+let refreshInterval;
+
+function startRefreshBar() {
+  refreshProgress = 0;
+  const bar = document.getElementById("refreshBar");
+  bar.style.width = "0%";
+  clearInterval(refreshInterval);
+  refreshInterval = setInterval(() => {
+    refreshProgress += 1;
+    bar.style.width = refreshProgress + "%";
+    if (refreshProgress >= 100) clearInterval(refreshInterval);
+  }, REFRESH_MS / 100);
+}
 
 function buildCards() {
   const grid = document.getElementById("meterGrid");
@@ -129,19 +317,45 @@ function buildCards() {
     let paramsHTML = "";
     PARAMS.forEach(p => {
       paramsHTML += `<div class="param ${p.colorClass}">
-        <div class="param-label">${p.label}</div>
-        <div class="param-value" id="m${i}_${p.key}">---<span class="param-unit">${p.unit}</span></div>
+        <div class="param-label">${p.label} <span class="param-unit-label">${p.unit}</span></div>
+        <div class="param-value" id="m${i}_${p.key}">---</div>
       </div>`;
     });
 
     card.innerHTML = `
-      <div class="meter-header" style="border-left: 4px solid ${METER_COLORS[i-1]}">
-        <h3>Meter ${i} <span style="color:#64748b;font-size:12px" id="m${i}_addr"></span></h3>
+      <div class="meter-header">
+        <div style="display:flex;align-items:center">
+          <span class="meter-number" style="background:${METER_COLORS[i-1]}">${i}</span>
+          <h3>Meter ${i}<span class="meter-addr" id="m${i}_addr"></span></h3>
+        </div>
         <span class="badge offline" id="m${i}_badge">OFFLINE</span>
       </div>
       <div class="params">${paramsHTML}</div>`;
+    card.querySelector('.meter-header').style.cssText += `--accent:${METER_COLORS[i-1]};`;
+    card.querySelector('.meter-header::before') ||
+      (card.querySelector('.meter-header').insertAdjacentHTML('afterbegin',
+        `<div style="position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,${METER_COLORS[i-1]},transparent)"></div>`));
     grid.appendChild(card);
   }
+}
+
+function updateSummary(data) {
+  let totalPower = 0, totalEnergy = 0, totalCurrent = 0, voltageSum = 0, voltageCount = 0, onlineCount = 0;
+  for (let i = 1; i <= 8; i++) {
+    const m = data["meter" + i];
+    if (!m || !m.online) continue;
+    onlineCount++;
+    totalPower += m.power || 0;
+    totalEnergy += m.energy || 0;
+    totalCurrent += m.current || 0;
+    voltageSum += m.voltage || 0;
+    voltageCount++;
+  }
+  document.getElementById("totalPower").innerHTML = totalPower.toFixed(1) + '<span class="param-unit"> W</span>';
+  document.getElementById("totalEnergy").innerHTML = totalEnergy.toFixed(2) + '<span class="param-unit"> kWh</span>';
+  document.getElementById("totalCurrent").innerHTML = totalCurrent.toFixed(2) + '<span class="param-unit"> A</span>';
+  document.getElementById("avgVoltage").innerHTML = (voltageCount > 0 ? (voltageSum/voltageCount).toFixed(1) : "--") + '<span class="param-unit"> V</span>';
+  document.getElementById("onlineCount").textContent = onlineCount + "/8";
 }
 
 function updateDashboard(data) {
@@ -152,14 +366,19 @@ function updateDashboard(data) {
   }
 
   document.getElementById("connDot").className = "status-dot online";
-  document.getElementById("connText").textContent = "Connected";
+  document.getElementById("connText").textContent = "Live";
 
   if (data.fw_version) document.getElementById("fwVersion").textContent = "FW v" + data.fw_version;
   if (data.ip) document.getElementById("espIP").textContent = data.ip;
   if (data.timestamp) {
     const d = new Date(data.timestamp);
-    document.getElementById("lastUpdate").textContent = d.toLocaleString();
+    const now = new Date();
+    const diff = Math.floor((now - d) / 1000);
+    let ago = diff < 60 ? diff + "s ago" : Math.floor(diff/60) + "m ago";
+    document.getElementById("lastUpdate").textContent = d.toLocaleTimeString() + " (" + ago + ")";
   }
+
+  updateSummary(data);
 
   for (let i = 1; i <= 8; i++) {
     const m = data["meter" + i];
@@ -169,7 +388,7 @@ function updateDashboard(data) {
     badge.textContent = m.online ? "ONLINE" : "OFFLINE";
     badge.className = "badge " + (m.online ? "online" : "offline");
 
-    document.getElementById("m" + i + "_addr").textContent = "[addr " + m.addr + "]";
+    document.getElementById("m" + i + "_addr").textContent = "addr " + m.addr;
 
     PARAMS.forEach(p => {
       const el = document.getElementById("m" + i + "_" + p.key);
@@ -178,7 +397,7 @@ function updateDashboard(data) {
         el.innerHTML = val + `<span class="param-unit">${p.unit}</span>`;
         el.classList.remove("offline");
       } else {
-        el.innerHTML = `---<span class="param-unit">${p.unit}</span>`;
+        el.innerHTML = `---`;
         el.classList.add("offline");
       }
     });
@@ -186,6 +405,7 @@ function updateDashboard(data) {
 }
 
 async function fetchData() {
+  startRefreshBar();
   try {
     const res = await fetch(FIREBASE_URL);
     const data = await res.json();
