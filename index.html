@@ -254,16 +254,6 @@
     <div class="summary-value" style="color:#fb923c" id="totalEnergy">-- <span class="param-unit">kWh</span></div>
     <div class="summary-sub">Cumulative consumption</div>
   </div>
-  <div class="summary-card">
-    <div class="summary-label">Avg Voltage</div>
-    <div class="summary-value" style="color:#fbbf24" id="avgVoltage">-- <span class="param-unit">V</span></div>
-    <div class="summary-sub">Across all meters</div>
-  </div>
-  <div class="summary-card">
-    <div class="summary-label">Total Current</div>
-    <div class="summary-value" style="color:#22d3ee" id="totalCurrent">-- <span class="param-unit">A</span></div>
-    <div class="summary-sub">All meters combined</div>
-  </div>
 </div>
 
 <div class="grid" id="meterGrid"></div>
@@ -353,8 +343,6 @@ function updateSummary(data) {
   }
   document.getElementById("totalPower").innerHTML = totalPower.toFixed(1) + '<span class="param-unit"> W</span>';
   document.getElementById("totalEnergy").innerHTML = totalEnergy.toFixed(2) + '<span class="param-unit"> kWh</span>';
-  document.getElementById("totalCurrent").innerHTML = totalCurrent.toFixed(2) + '<span class="param-unit"> A</span>';
-  document.getElementById("avgVoltage").innerHTML = (voltageCount > 0 ? (voltageSum/voltageCount).toFixed(1) : "--") + '<span class="param-unit"> V</span>';
   document.getElementById("onlineCount").textContent = onlineCount + "/8";
 }
 
