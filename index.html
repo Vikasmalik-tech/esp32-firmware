@@ -213,6 +213,68 @@
   @media (max-width: 400px) {
     .summary { grid-template-columns: 1fr; }
   }
+
+  /* Clickable hint on cards */
+  .meter-card { cursor: pointer; }
+  .graph-hint {
+    font-size: 14px; opacity: 0.45; transition: opacity 0.2s, transform 0.2s;
+  }
+  .meter-card:hover .graph-hint { opacity: 1; transform: scale(1.15); }
+
+  /* Graph modal */
+  .modal-overlay {
+    position: fixed; inset: 0; z-index: 500;
+    background: rgba(3, 6, 15, 0.82); backdrop-filter: blur(8px);
+    display: none; align-items: center; justify-content: center; padding: 20px;
+  }
+  .modal-overlay.open { display: flex; animation: fadeIn 0.18s ease; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  .modal {
+    background: linear-gradient(145deg, rgba(17, 24, 39, 0.98), rgba(8, 12, 26, 0.98));
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 18px; width: min(1100px, 96vw); max-height: 92vh;
+    overflow-y: auto; box-shadow: 0 30px 80px rgba(0,0,0,0.6);
+  }
+  .modal-header {
+    position: sticky; top: 0; z-index: 2;
+    background: rgba(10, 15, 30, 0.96); backdrop-filter: blur(10px);
+    padding: 16px 22px; display: flex; align-items: center;
+    justify-content: space-between; gap: 14px; flex-wrap: wrap;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+  }
+  .modal-header h2 { font-size: 17px; font-weight: 700; }
+  .modal-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block;
+    box-shadow: 0 0 10px rgba(255,255,255,0.25); }
+  .modal-legend { display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+    font-size: 12px; color: #94a3b8; }
+  .modal-legend .lg { display: flex; align-items: center; gap: 7px; }
+  .lg-line { display: inline-block; width: 22px; height: 0; }
+  .lg-line.solid  { border-top: 3px solid #94a3b8; }
+  .lg-line.dashed { border-top: 2px dashed #94a3b8; }
+  .hist-note { color: #f59e0b; font-size: 11px; }
+  .modal-close {
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+    color: #cbd5e1; width: 32px; height: 32px; border-radius: 9px;
+    font-size: 20px; line-height: 1; cursor: pointer; transition: background 0.2s;
+  }
+  .modal-close:hover { background: rgba(239, 68, 68, 0.25); color: #fff; }
+  .modal-charts {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 18px; padding: 22px;
+  }
+  .chart-box {
+    background: rgba(0,0,0,0.28); border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 12px; padding: 14px 14px 8px;
+  }
+  .chart-box h4 {
+    font-size: 12px; font-weight: 600; color: #94a3b8; margin-bottom: 10px;
+    text-transform: uppercase; letter-spacing: 1px;
+  }
+  .chart-box h4 span { color: #475569; font-weight: 500; }
+  .chart-box canvas { width: 100% !important; height: 200px !important; }
+  @media (max-width: 760px) {
+    .modal-charts { grid-template-columns: 1fr; padding: 14px; gap: 14px; }
+    .modal-legend { gap: 10px; }
+  }
 </style>
 </head>
 <body>
@@ -262,9 +324,38 @@
   Energy Meter Dashboard &mdash; Powered by ESP32 + Firebase
 </div>
 
+<!-- Graph modal -->
+<div class="modal-overlay" id="meterModal" onclick="if(event.target===this) closeMeterModal()">
+  <div class="modal">
+    <div class="modal-header">
+      <div style="display:flex;align-items:center;gap:12px">
+        <span class="modal-dot" id="modalDot"></span>
+        <h2 id="modalTitle">Meter</h2>
+      </div>
+      <div class="modal-legend">
+        <span class="lg"><span class="lg-line dashed"></span> History (Sheets &middot; 1 min)</span>
+        <span class="lg"><span class="lg-line solid"></span> Live (5 s)</span>
+        <span class="hist-note" id="histNote"></span>
+        <button class="modal-close" onclick="closeMeterModal()" title="Close">&times;</button>
+      </div>
+    </div>
+    <div class="modal-charts">
+      <div class="chart-box"><h4>Voltage <span>V</span></h4><canvas id="chart_v"></canvas></div>
+      <div class="chart-box"><h4>Current <span>A</span></h4><canvas id="chart_c"></canvas></div>
+      <div class="chart-box"><h4>Power <span>W</span></h4><canvas id="chart_p"></canvas></div>
+      <div class="chart-box"><h4>Power Factor</h4><canvas id="chart_pf"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
 const FIREBASE_URL = "https://energy-meter-5d179-default-rtdb.asia-southeast1.firebasedatabase.app/meters.json";
+// Same /exec URL as the firmware SHEETS_SCRIPT_URL — doGet serves graph history.
+const SHEETS_URL = "https://script.google.com/macros/s/AKfycbyQwk_9ldeczFIXu55K_bBWrBhEwspjScGzpZx9NhneeIsTW70ajH8ZO_giTK3Vf7jaHQ/exec";
 const REFRESH_MS = 5000;
+const HISTORY_LIMIT = 180;     // rows pulled from Sheets (~3h at 60s)
+const MAX_LIVE_POINTS = 720;   // cap live buffer (~1h at 5s)
 
 const PARAMS = [
   { key: "voltage",   label: "Voltage",        unit: "V",   decimals: 1, colorClass: "color-voltage" },
@@ -280,6 +371,19 @@ const METER_COLORS = [
   "#2563eb", "#16a34a", "#06b6d4", "#8b5cf6",
   "#f59e0b", "#ef4444", "#ec4899", "#14b8a6"
 ];
+
+// The 4 params shown in the graphs. `key` matches doGet output (v/c/p/pf);
+// `srcKey` matches the live Firebase fields (voltage/current/power/pf).
+const CHART_PARAMS = [
+  { key: "v",  srcKey: "voltage", label: "Voltage",      unit: "V",  dec: 1, color: "#fbbf24" },
+  { key: "c",  srcKey: "current", label: "Current",      unit: "A",  dec: 3, color: "#22d3ee" },
+  { key: "p",  srcKey: "power",   label: "Power",        unit: "W",  dec: 1, color: "#4ade80" },
+  { key: "pf", srcKey: "pf",      label: "Power Factor", unit: "",   dec: 3, color: "#60a5fa" }
+];
+
+let openMeterId = null;   // which meter's modal is open (null = closed)
+let modalCharts = {};     // chart key -> Chart instance
+let liveData = {};        // chart key -> [{x: epochMs, y: value}] (live segment)
 
 let refreshProgress = 0;
 let refreshInterval;
@@ -303,6 +407,8 @@ function buildCards() {
     const card = document.createElement("div");
     card.className = "meter-card";
     card.id = "meter" + i;
+    card.title = "Click to view graphs";
+    card.onclick = () => openMeterModal(i);
 
     let paramsHTML = "";
     PARAMS.forEach(p => {
@@ -318,7 +424,10 @@ function buildCards() {
           <span class="meter-number" style="background:${METER_COLORS[i-1]}">${i}</span>
           <h3>Meter ${i}<span class="meter-addr" id="m${i}_addr"></span></h3>
         </div>
-        <span class="badge offline" id="m${i}_badge">OFFLINE</span>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span class="graph-hint" title="Click to view graphs">&#128200;</span>
+          <span class="badge offline" id="m${i}_badge">OFFLINE</span>
+        </div>
       </div>
       <div class="params">${paramsHTML}</div>`;
     card.querySelector('.meter-header').style.cssText += `--accent:${METER_COLORS[i-1]};`;
@@ -390,7 +499,129 @@ function updateDashboard(data) {
       }
     });
   }
+
+  appendLivePoint(data);
 }
+
+/* ---------- Graph modal ---------- */
+
+function fmtTime(ms) {
+  return new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+function hexToRgba(hex, a) {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`;
+}
+
+function makeChart(canvasId, param) {
+  const ctx = document.getElementById(canvasId).getContext("2d");
+  return new Chart(ctx, {
+    type: "line",
+    data: {
+      datasets: [
+        { // History — dashed
+          label: "History", data: [], borderColor: hexToRgba(param.color, 0.7),
+          borderDash: [6, 5], borderWidth: 1.5, pointRadius: 0, tension: 0.25,
+          fill: false, spanGaps: true
+        },
+        { // Live — solid + soft glow fill
+          label: "Live", data: [], borderColor: param.color, borderWidth: 2.5,
+          pointRadius: 0, tension: 0.25, fill: true,
+          backgroundColor: hexToRgba(param.color, 0.08), spanGaps: true
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      interaction: { mode: "nearest", intersect: false },
+      scales: {
+        x: { type: "linear",
+             ticks: { color: "#64748b", font: { size: 10 }, maxTicksLimit: 6,
+                      callback: (v) => fmtTime(v) },
+             grid: { color: "rgba(255,255,255,0.04)" } },
+        y: { ticks: { color: "#64748b", font: { size: 10 } },
+             grid: { color: "rgba(255,255,255,0.04)" } }
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          mode: "nearest", intersect: false,
+          callbacks: {
+            title: (it) => it.length ? fmtTime(it[0].parsed.x) : "",
+            label: (it) => param.label + ": " + it.parsed.y.toFixed(param.dec) + " " + param.unit
+          }
+        }
+      }
+    }
+  });
+}
+
+function openMeterModal(i) {
+  openMeterId = i;
+  document.getElementById("modalTitle").textContent = "Meter " + i + " — Trends";
+  document.getElementById("modalDot").style.background = METER_COLORS[i - 1];
+  document.getElementById("histNote").textContent = "";
+  document.getElementById("meterModal").classList.add("open");
+
+  // fresh charts
+  Object.values(modalCharts).forEach((c) => c.destroy());
+  modalCharts = {}; liveData = {};
+  CHART_PARAMS.forEach((p) => { modalCharts[p.key] = makeChart("chart_" + p.key, p); });
+
+  loadHistory(i);
+}
+
+function closeMeterModal() {
+  openMeterId = null;
+  Object.values(modalCharts).forEach((c) => c.destroy());
+  modalCharts = {}; liveData = {};
+  document.getElementById("meterModal").classList.remove("open");
+}
+
+async function loadHistory(i) {
+  try {
+    const res = await fetch(SHEETS_URL + "?meter=" + i + "&limit=" + HISTORY_LIMIT);
+    const json = await res.json();
+    if (openMeterId !== i) return;            // user already closed/switched
+    const pts = json.points || [];
+    CHART_PARAMS.forEach((p) => {
+      const hist = pts.map((pt) => ({ x: pt.t, y: Number(pt[p.key]) }))
+                      .filter((o) => isFinite(o.y));
+      const ch = modalCharts[p.key];
+      if (!ch) return;
+      ch.data.datasets[0].data = hist;                       // dashed history
+      // seed the live (solid) line at the end of history so they connect
+      liveData[p.key] = hist.length ? [hist[hist.length - 1]] : [];
+      ch.data.datasets[1].data = liveData[p.key];
+      ch.update("none");
+    });
+    if (!pts.length) document.getElementById("histNote").textContent = "No history logged yet";
+  } catch (e) {
+    if (openMeterId === i)
+      document.getElementById("histNote").textContent = "History unavailable — live only";
+  }
+}
+
+function appendLivePoint(data) {
+  if (openMeterId == null) return;
+  const m = data["meter" + openMeterId];
+  if (!m || !m.online) return;
+  const now = Date.now();
+  CHART_PARAMS.forEach((p) => {
+    const y = Number(m[p.srcKey]);
+    if (!isFinite(y)) return;
+    let arr = liveData[p.key];
+    if (!arr) { arr = []; liveData[p.key] = arr; }
+    arr.push({ x: now, y: y });
+    if (arr.length > MAX_LIVE_POINTS) arr.shift();
+    const ch = modalCharts[p.key];
+    if (ch) { ch.data.datasets[1].data = arr; ch.update("none"); }
+  });
+}
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && openMeterId != null) closeMeterModal();
+});
 
 async function fetchData() {
   startRefreshBar();
