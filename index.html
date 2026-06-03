@@ -334,7 +334,7 @@
   <div class="info-item"><span class="info-icon">&#128337;</span> Last update: <strong id="lastUpdate">--</strong></div>
   <div class="info-item"><span class="info-icon">&#128225;</span> ESP32 IP: <strong id="espIP">--</strong></div>
   <div class="info-item"><span class="info-icon">&#9889;</span> Meters online: <strong id="onlineCount">0/8</strong></div>
-  <div class="info-item"><span class="info-icon">&#128260;</span> Auto-refresh: <strong>5s</strong></div>
+  <div class="info-item"><span class="info-icon">&#128260;</span> Auto-refresh: <strong>1s</strong></div>
 </div>
 
 <div class="summary" id="summarySection">
@@ -398,7 +398,7 @@
 const FIREBASE_URL = "https://energy-meter-5d179-default-rtdb.asia-southeast1.firebasedatabase.app/meters.json";
 // Same /exec URL as the firmware SHEETS_SCRIPT_URL — doGet serves graph history.
 const SHEETS_URL = "https://script.google.com/macros/s/AKfycbyQwk_9ldeczFIXu55K_bBWrBhEwspjScGzpZx9NhneeIsTW70ajH8ZO_giTK3Vf7jaHQ/exec";
-const REFRESH_MS = 5000;
+const REFRESH_MS = 1000;
 const HISTORY_LIMIT = 180;     // rows pulled from Sheets (~3h at 60s)
 const MAX_LIVE_POINTS = 720;   // cap live buffer (~1h at 5s)
 
