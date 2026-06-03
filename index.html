@@ -335,6 +335,7 @@
   <div class="info-item"><span class="info-icon">&#128225;</span> ESP32 IP: <strong id="espIP">--</strong></div>
   <div class="info-item"><span class="info-icon">&#9889;</span> Meters online: <strong id="onlineCount">0/8</strong></div>
   <div class="info-item"><span class="info-icon">&#128260;</span> Auto-refresh: <strong>1s</strong></div>
+  <div class="info-item"><span class="info-icon">&#128190;</span> Sheet space: <strong id="sheetSpace">--</strong></div>
 </div>
 
 <div class="summary" id="summarySection">
@@ -772,9 +773,26 @@ async function fetchData() {
   }
 }
 
+// Sheet space gauge — shows how full the Google Sheet is (10M-cell cap).
+async function fetchSheetSpace() {
+  try {
+    const res = await fetch(SHEETS_URL + "?usage=1");
+    const j = await res.json();
+    const el = document.getElementById("sheetSpace");
+    if (el && typeof j.percent === "number") {
+      el.textContent = j.percent.toFixed(1) + "%";
+      el.style.color = j.percent >= 90 ? "#f87171"
+                     : j.percent >= 70 ? "#fbbf24" : "#4ade80";
+      if (j.rows != null) el.title = j.rows.toLocaleString() + " rows logged";
+    }
+  } catch (e) { /* leave as-is on error */ }
+}
+
 buildCards();
 fetchData();
 setInterval(fetchData, REFRESH_MS);
+fetchSheetSpace();
+setInterval(fetchSheetSpace, 60000);   // update the space gauge every minute
 </script>
 </body>
 </html>
