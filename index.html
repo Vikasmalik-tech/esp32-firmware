@@ -225,15 +225,14 @@
   .modal-overlay {
     position: fixed; inset: 0; z-index: 500;
     background: rgba(3, 6, 15, 0.82); backdrop-filter: blur(8px);
-    display: none; align-items: center; justify-content: center; padding: 20px;
+    display: none; padding: 0;
   }
-  .modal-overlay.open { display: flex; animation: fadeIn 0.18s ease; }
+  .modal-overlay.open { display: block; animation: fadeIn 0.18s ease; }
   @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
   .modal {
-    background: linear-gradient(145deg, rgba(17, 24, 39, 0.98), rgba(8, 12, 26, 0.98));
-    border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 18px; width: min(1100px, 96vw); max-height: 92vh;
-    overflow-y: auto; box-shadow: 0 30px 80px rgba(0,0,0,0.6);
+    background: linear-gradient(145deg, rgba(17, 24, 39, 0.99), rgba(8, 12, 26, 0.99));
+    width: 100vw; height: 100vh; height: 100dvh;
+    display: flex; flex-direction: column; overflow: hidden;
   }
   .modal-header {
     position: sticky; top: 0; z-index: 2;
@@ -259,20 +258,30 @@
   }
   .modal-close:hover { background: rgba(239, 68, 68, 0.25); color: #fff; }
   .modal-charts {
-    display: grid; grid-template-columns: 1fr 1fr; gap: 18px; padding: 22px;
+    flex: 1; min-height: 0; overflow: hidden;
+    display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr;
+    gap: 18px; padding: 22px;
   }
   .chart-box {
     background: rgba(0,0,0,0.28); border: 1px solid rgba(255,255,255,0.05);
-    border-radius: 12px; padding: 14px 14px 8px;
+    border-radius: 12px; padding: 14px 14px 10px;
+    display: flex; flex-direction: column; min-height: 0;
   }
   .chart-box h4 {
     font-size: 12px; font-weight: 600; color: #94a3b8; margin-bottom: 10px;
     text-transform: uppercase; letter-spacing: 1px;
   }
   .chart-box h4 span { color: #475569; font-weight: 500; }
-  .chart-box canvas { width: 100% !important; height: 200px !important; }
+  .canvas-wrap { position: relative; flex: 1; min-height: 0; }
+  .canvas-wrap canvas { position: absolute; inset: 0; width: 100% !important; height: 100% !important; }
   @media (max-width: 760px) {
-    .modal-charts { grid-template-columns: 1fr; padding: 14px; gap: 14px; }
+    .modal { overflow-y: auto; }
+    .modal-charts {
+      flex: none; overflow: visible;
+      grid-template-columns: 1fr; grid-template-rows: none;
+      padding: 14px; gap: 14px;
+    }
+    .canvas-wrap { height: 240px; flex: none; }
     .modal-legend { gap: 10px; }
   }
 
@@ -374,10 +383,10 @@
       <span class="zoom-hint">Scroll / pinch to zoom &middot; drag to pan</span>
     </div>
     <div class="modal-charts">
-      <div class="chart-box"><h4>Voltage <span>V</span></h4><canvas id="chart_v"></canvas></div>
-      <div class="chart-box"><h4>Current <span>A</span></h4><canvas id="chart_c"></canvas></div>
-      <div class="chart-box"><h4>Power <span>W</span></h4><canvas id="chart_p"></canvas></div>
-      <div class="chart-box"><h4>Power Factor</h4><canvas id="chart_pf"></canvas></div>
+      <div class="chart-box"><h4>Voltage <span>V</span></h4><div class="canvas-wrap"><canvas id="chart_v"></canvas></div></div>
+      <div class="chart-box"><h4>Current <span>A</span></h4><div class="canvas-wrap"><canvas id="chart_c"></canvas></div></div>
+      <div class="chart-box"><h4>Power <span>W</span></h4><div class="canvas-wrap"><canvas id="chart_p"></canvas></div></div>
+      <div class="chart-box"><h4>Power Factor</h4><div class="canvas-wrap"><canvas id="chart_pf"></canvas></div></div>
     </div>
   </div>
 </div>
