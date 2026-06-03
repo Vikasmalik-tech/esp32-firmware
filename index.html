@@ -275,6 +275,29 @@
     .modal-charts { grid-template-columns: 1fr; padding: 14px; gap: 14px; }
     .modal-legend { gap: 10px; }
   }
+
+  /* Graph toolbar (time-range + zoom controls) */
+  .modal-toolbar {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding: 12px 22px; border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .range-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+  .rbtn {
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+    color: #94a3b8; padding: 6px 13px; border-radius: 8px; font-size: 12px;
+    font-weight: 600; cursor: pointer; font-family: inherit; transition: all 0.15s;
+  }
+  .rbtn:hover { background: rgba(255,255,255,0.1); color: #e2e8f0; }
+  .rbtn.active {
+    background: linear-gradient(135deg, #2563eb, #7c3aed);
+    color: #fff; border-color: transparent;
+  }
+  .rbtn.reset { margin-left: auto; }
+  .zoom-hint { font-size: 11px; color: #475569; }
+  @media (max-width: 760px) {
+    .zoom-hint { display: none; }
+    .rbtn.reset { margin-left: 0; }
+  }
 </style>
 </head>
 <body>
@@ -339,6 +362,17 @@
         <button class="modal-close" onclick="closeMeterModal()" title="Close">&times;</button>
       </div>
     </div>
+    <div class="modal-toolbar">
+      <div class="range-btns">
+        <button class="rbtn" data-range="live">Live</button>
+        <button class="rbtn" data-range="1h">1h</button>
+        <button class="rbtn" data-range="6h">6h</button>
+        <button class="rbtn" data-range="24h">24h</button>
+        <button class="rbtn" data-range="all">All</button>
+      </div>
+      <button class="rbtn reset" id="resetZoomBtn">&#8635; Reset zoom</button>
+      <span class="zoom-hint">Scroll / pinch to zoom &middot; drag to pan</span>
+    </div>
     <div class="modal-charts">
       <div class="chart-box"><h4>Voltage <span>V</span></h4><canvas id="chart_v"></canvas></div>
       <div class="chart-box"><h4>Current <span>A</span></h4><canvas id="chart_c"></canvas></div>
@@ -349,6 +383,8 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
 <script>
 const FIREBASE_URL = "https://energy-meter-5d179-default-rtdb.asia-southeast1.firebasedatabase.app/meters.json";
 // Same /exec URL as the firmware SHEETS_SCRIPT_URL — doGet serves graph history.
@@ -384,6 +420,37 @@ const CHART_PARAMS = [
 let openMeterId = null;   // which meter's modal is open (null = closed)
 let modalCharts = {};     // chart key -> Chart instance
 let liveData = {};        // chart key -> [{x: epochMs, y: value}] (live segment)
+
+// Time-range presets: ms = visible window width (null = show all), rows = history rows to load.
+const RANGES = {
+  live: { ms: 15 * 60 * 1000,      rows: 360 },
+  "1h": { ms: 60 * 60 * 1000,      rows: 360 },
+  "6h": { ms: 6 * 60 * 60 * 1000,  rows: 360 },
+  "24h":{ ms: 24 * 60 * 60 * 1000, rows: 1500 },
+  all:  { ms: null,                rows: 3000 }
+};
+let currentRange = "6h";  // active range button
+let follow = true;        // keep right edge at "now" (turned off when the user zooms/pans)
+let histLimitLoaded = 0;  // how many history rows we've fetched so far
+
+// Vertical crosshair line that follows the hovered point on a chart.
+const crosshairPlugin = {
+  id: "crosshair",
+  afterDraw(chart) {
+    const act = chart.tooltip && chart.tooltip._active;
+    if (act && act.length) {
+      const x = act[0].element.x;
+      const { top, bottom } = chart.chartArea;
+      const ctx = chart.ctx;
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(x, top); ctx.lineTo(x, bottom);
+      ctx.lineWidth = 1; ctx.strokeStyle = "rgba(255,255,255,0.35)";
+      ctx.setLineDash([4, 4]); ctx.stroke();
+      ctx.restore();
+    }
+  }
+};
 
 let refreshProgress = 0;
 let refreshInterval;
@@ -517,23 +584,25 @@ function makeChart(canvasId, param) {
   const ctx = document.getElementById(canvasId).getContext("2d");
   return new Chart(ctx, {
     type: "line",
+    plugins: [crosshairPlugin],
     data: {
       datasets: [
         { // History — dashed
           label: "History", data: [], borderColor: hexToRgba(param.color, 0.7),
-          borderDash: [6, 5], borderWidth: 1.5, pointRadius: 0, tension: 0.25,
-          fill: false, spanGaps: true
+          borderDash: [6, 5], borderWidth: 1.5, pointRadius: 0, pointHoverRadius: 4,
+          pointHoverBackgroundColor: param.color, tension: 0.25, fill: false, spanGaps: true
         },
         { // Live — solid + soft glow fill
           label: "Live", data: [], borderColor: param.color, borderWidth: 2.5,
-          pointRadius: 0, tension: 0.25, fill: true,
+          pointRadius: 0, pointHoverRadius: 4, pointHoverBackgroundColor: param.color,
+          tension: 0.25, fill: true,
           backgroundColor: hexToRgba(param.color, 0.08), spanGaps: true
         }
       ]
     },
     options: {
       responsive: true, maintainAspectRatio: false, animation: false,
-      interaction: { mode: "nearest", intersect: false },
+      interaction: { mode: "nearest", intersect: false, axis: "x" },
       scales: {
         x: { type: "linear",
              ticks: { color: "#64748b", font: { size: 10 }, maxTicksLimit: 6,
@@ -545,11 +614,23 @@ function makeChart(canvasId, param) {
       plugins: {
         legend: { display: false },
         tooltip: {
-          mode: "nearest", intersect: false,
+          mode: "nearest", intersect: false, axis: "x",
+          backgroundColor: "rgba(8,12,26,0.95)", borderColor: "rgba(255,255,255,0.12)",
+          borderWidth: 1, padding: 10, displayColors: false,
           callbacks: {
             title: (it) => it.length ? fmtTime(it[0].parsed.x) : "",
             label: (it) => param.label + ": " + it.parsed.y.toFixed(param.dec) + " " + param.unit
           }
+        },
+        zoom: {
+          zoom: {
+            wheel: { enabled: true },
+            pinch: { enabled: true },
+            mode: "x",
+            onZoom: () => { follow = false; }
+          },
+          pan: { enabled: true, mode: "x", onPan: () => { follow = false; } },
+          limits: { x: { minRange: 60000 } }   // can't zoom in tighter than 1 min
         }
       }
     }
@@ -558,17 +639,24 @@ function makeChart(canvasId, param) {
 
 function openMeterModal(i) {
   openMeterId = i;
+  currentRange = "6h"; follow = true; histLimitLoaded = 0;
   document.getElementById("modalTitle").textContent = "Meter " + i + " — Trends";
   document.getElementById("modalDot").style.background = METER_COLORS[i - 1];
   document.getElementById("histNote").textContent = "";
   document.getElementById("meterModal").classList.add("open");
+  setActiveRangeBtn(currentRange);
 
   // fresh charts
   Object.values(modalCharts).forEach((c) => c.destroy());
   modalCharts = {}; liveData = {};
   CHART_PARAMS.forEach((p) => { modalCharts[p.key] = makeChart("chart_" + p.key, p); });
 
-  loadHistory(i);
+  loadHistory(i, RANGES[currentRange].rows, true).then(refreshWindowAndDraw);
+}
+
+function setActiveRangeBtn(key) {
+  document.querySelectorAll(".rbtn[data-range]").forEach((b) =>
+    b.classList.toggle("active", b.dataset.range === key));
 }
 
 function closeMeterModal() {
@@ -578,9 +666,10 @@ function closeMeterModal() {
   document.getElementById("meterModal").classList.remove("open");
 }
 
-async function loadHistory(i) {
+async function loadHistory(i, limit, seedLive) {
+  histLimitLoaded = limit;
   try {
-    const res = await fetch(SHEETS_URL + "?meter=" + i + "&limit=" + HISTORY_LIMIT);
+    const res = await fetch(SHEETS_URL + "?meter=" + i + "&limit=" + limit);
     const json = await res.json();
     if (openMeterId !== i) return;            // user already closed/switched
     const pts = json.points || [];
@@ -590,12 +679,14 @@ async function loadHistory(i) {
       const ch = modalCharts[p.key];
       if (!ch) return;
       ch.data.datasets[0].data = hist;                       // dashed history
-      // seed the live (solid) line at the end of history so they connect
-      liveData[p.key] = hist.length ? [hist[hist.length - 1]] : [];
-      ch.data.datasets[1].data = liveData[p.key];
+      if (seedLive) {
+        // seed the live (solid) line at the end of history so they connect
+        liveData[p.key] = hist.length ? [hist[hist.length - 1]] : [];
+        ch.data.datasets[1].data = liveData[p.key];
+      }
       ch.update("none");
     });
-    if (!pts.length) document.getElementById("histNote").textContent = "No history logged yet";
+    document.getElementById("histNote").textContent = pts.length ? "" : "No history logged yet";
   } catch (e) {
     if (openMeterId === i)
       document.getElementById("histNote").textContent = "History unavailable — live only";
@@ -615,13 +706,50 @@ function appendLivePoint(data) {
     arr.push({ x: now, y: y });
     if (arr.length > MAX_LIVE_POINTS) arr.shift();
     const ch = modalCharts[p.key];
-    if (ch) { ch.data.datasets[1].data = arr; ch.update("none"); }
+    if (ch) ch.data.datasets[1].data = arr;
   });
+  refreshWindowAndDraw();
+}
+
+// Pick a time range: load more history if needed, then snap the visible window.
+async function applyRange(key) {
+  if (openMeterId == null) return;
+  currentRange = key; follow = true;
+  setActiveRangeBtn(key);
+  if (RANGES[key].rows > histLimitLoaded) await loadHistory(openMeterId, RANGES[key].rows, false);
+  refreshWindowAndDraw();
+}
+
+// Redraw all charts; if "follow" is on, keep the window pinned to the latest data.
+function refreshWindowAndDraw() {
+  const r = RANGES[currentRange];
+  const now = Date.now();
+  Object.values(modalCharts).forEach((ch) => {
+    if (follow) {
+      if (r.ms == null) { ch.options.scales.x.min = undefined; ch.options.scales.x.max = undefined; }
+      else { ch.options.scales.x.min = now - r.ms; ch.options.scales.x.max = now; }
+    }
+    ch.update("none");
+  });
+}
+
+// Reset zoom button: clear any manual zoom/pan and re-follow the current range.
+function resetView() {
+  Object.values(modalCharts).forEach((ch) => {
+    if (ch.resetZoom) { try { ch.resetZoom("none"); } catch (e) {} }
+  });
+  follow = true;
+  applyRange(currentRange);
 }
 
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && openMeterId != null) closeMeterModal();
 });
+
+// Wire the toolbar buttons (static elements, so wire once).
+document.querySelectorAll(".rbtn[data-range]").forEach((b) =>
+  b.addEventListener("click", () => applyRange(b.dataset.range)));
+document.getElementById("resetZoomBtn").addEventListener("click", resetView);
 
 async function fetchData() {
   startRefreshBar();
